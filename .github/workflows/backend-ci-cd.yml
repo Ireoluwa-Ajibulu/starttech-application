@@ -11,7 +11,7 @@ on:
       - 'backend/**'
 
 env:
-  AWS_REGION: eu-north-1
+  AWS_REGION: eu-west-1
   ECR_REPOSITORY: starttech-backend
   IMAGE_TAG: ${{ github.sha }}
 
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
       - name: Install dependencies
         working-directory: backend/MuchToDo
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: backend/MuchToDo
-        run: go test ./... -v -cover
+        run: go test ./... -v
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
@@ -114,21 +114,7 @@ jobs:
           aws ssm send-command \
             --targets "Key=tag:aws:autoscaling:groupName,Values=starttech-asg" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands=[
-              "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}",
-              "docker pull ${{ needs.build.outputs.image_uri }}",
-              "docker stop starttech-backend || true",
-              "docker rm starttech-backend || true",
-              "docker run -d --name starttech-backend \
-                -p 8080:8080 \
-                -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
-                -e REDIS_URL=${{ secrets.REDIS_URL }} \
-                -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-                --log-driver=awslogs \
-                --log-opt awslogs-region=${{ env.AWS_REGION }} \
-                --log-opt awslogs-group=starttech-app-logs \
-                ${{ needs.build.outputs.image_uri }}"
-            ] \
+            --parameters commands=["aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}","docker pull ${{ needs.build.outputs.image_uri }}","docker stop starttech-backend || true","docker rm starttech-backend || true","docker run -d --name starttech-backend -p 8080:8080 -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e REDIS_URL=${{ secrets.REDIS_URL }} -e JWT_SECRET=${{ secrets.JWT_SECRET }} --log-driver=awslogs --log-opt awslogs-region=${{ env.AWS_REGION }} --log-opt awslogs-group=starttech-app-logs ${{ needs.build.outputs.image_uri }}"] \
             --region ${{ env.AWS_REGION }}
 
       - name: Run smoke tests
@@ -137,7 +123,7 @@ jobs:
           ALB_DNS=${{ secrets.ALB_DNS_NAME }}
           response=$(curl -s -o /dev/null -w "%{http_code}" http://$ALB_DNS/health)
           if [ $response -eq 200 ]; then
-            echo " Smoke test passed!"
+            echo "Smoke test passed!"
           else
             echo "Smoke test failed with status $response"
             exit 1
